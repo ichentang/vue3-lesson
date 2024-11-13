@@ -1,4 +1,4 @@
-import { track } from './reactiveEffect';
+import { track, trigger } from './reactiveEffect';
 
 // 枚举
 export enum ReactiveFlags {
@@ -22,7 +22,14 @@ export const mutableHandlers: ProxyHandler<any> = {
   },
   set(target, key, value, recevier) {
     // 找到属性 让对应的effect重新执行
+    let oldValue = target[key];
+
+    let result = Reflect.set(target, key, value, recevier);
+    if (oldValue !== value) {
+      // 需要触发页面更新
+      trigger(target, key, value, oldValue);
+    }
     // 出发更新 TODO...
-    return Reflect.set(target, key, value, recevier);
+    return result;
   },
 };

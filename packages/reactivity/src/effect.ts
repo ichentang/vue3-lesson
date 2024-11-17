@@ -6,11 +6,17 @@ export function effect(fn, options?) {
     // scheduler
     _effect.run();
   });
-
   // 先执行一次
   _effect.run();
 
-  return _effect;
+  if (options) {
+    Object.assign(_effect, options); //用用户传递的覆盖内置的
+  }
+
+  const runner = _effect.run.bind(_effect);
+
+  runner.effect = _effect; //可以在RUN方法上获取到effect的引用
+  return runner;
 }
 
 export let activeEffect;
@@ -25,16 +31,22 @@ function postCleanEffect(effect) {
     for (let i = effect._depsLength; i < effect.deps.length; i++) {
       cleanDepEffect(effect.deps[i], effect); //删除映射表中的effect
     }
-
     effect.deps.length = effect._depsLength; //更新依赖列表的长度
+  }
+}
+
+function cleanDepEffect(dep, effect) {
+  dep.delete(effect);
+  if (dep.size == 0) {
+    dep.cleanup(); //如果map为空，则删除这个属性
   }
 }
 
 class ReactiveEffect {
   _trackId = 0; //用于记录当前effect执行了几次
-
   deps = [];
   _depsLength = 0;
+  _running = 0;
 
   public active = true; //创建的effect是响应式的
   // fn 用户编写的函数
@@ -56,8 +68,12 @@ class ReactiveEffect {
 
       preCleanEffect(this);
 
+      this._running++;
+
       return this.fn(); //依赖收集
     } finally {
+      this._running--;
+
       // run方法执行完清空依赖
       postCleanEffect(this);
 
@@ -70,17 +86,9 @@ class ReactiveEffect {
   }
 }
 
-function cleanDepEffect(dep, effect) {
-  dep.delete(effect);
-  if (dep.size == 0) {
-    dep.cleanup(); //如果map为空，则删除这个属性
-  }
-}
-
 // 收集依赖，双向记忆
 // 1. _trackId用于记录执行次数（防止一个属性在当前effect中多次依赖收集）只收集一次
 // 2.拿到上一次依赖的最后一个和这次的比较
-
 export function trackEffect(effect, dep) {
   // 收集时一个个收集
   // 需要重新收集依赖，将不需要的移除
@@ -111,10 +119,13 @@ export function trackEffect(effect, dep) {
 }
 
 // 触发依赖
-export function triggerEffect(dep) {
+export function triggerEffects(dep) {
   for (const effect of dep.keys()) {
     if (effect.scheduler) {
-      effect.scheduler(); // -> effect.run()
+      // 如果不是正在执行，才能执行
+      if (!effect._running) {
+        effect.scheduler(); // -> effect.run()
+      }
     }
   }
 }

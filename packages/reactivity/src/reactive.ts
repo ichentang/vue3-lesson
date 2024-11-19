@@ -1,5 +1,6 @@
 import { isObject } from '@vue/shared';
-import { ReactiveFlags, mutableHandlers } from './baseHandler';
+import { mutableHandlers } from './baseHandler';
+import { ReactiveFlags } from './constants';
 
 // 用于记录我们的代理后的结果 可以服用
 const reactiveMap = new WeakMap();

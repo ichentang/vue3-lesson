@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+
+  <style>
+    body {
+      background: #262627;
+    }
+
+    #app {
+      color: aliceblue;
+      font-size: 30px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { reactive, effect, ref, toRef, toRefs, proxyRefs, computed } from "./packages/reactivity/dist/reactivity.js";
+
+    let obj = { name: "guang", age: 18, flag: true, address: { n: 8888 } };
+
+    const state = reactive(obj);
+
+    const al = computed({
+      get(oldValue) {
+        console.log("jrqwi", oldValue);
+        return "999" + state.name;
+      },
+      set(v) {
+        console.log("触发更新了", v);
+      }
+    })
+
+    effect(() => {
+      console.log(al.value);
+    })
+
+    setTimeout(() => {
+      state.anme = "888888"
+      al.value = "809087879"
+    }, 3000)
+  </script>
+</body>
+
+</html>

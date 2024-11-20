@@ -25,7 +25,7 @@ importers:
   packages/reactivity:
     dependencies:
       '@vue/shared':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../shared
 
   packages/shared: {}

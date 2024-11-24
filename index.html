@@ -28,24 +28,21 @@
 
     const state = reactive(obj);
 
-    const al = computed({
-      get(oldValue) {
-        console.log("jrqwi", oldValue);
-        return "999" + state.name;
-      },
-      set(v) {
-        console.log("触发更新了", v);
-      }
-    })
+    const name = ref('guang')
 
-    effect(() => {
-      console.log(al.value);
-    })
+    const unwatch = watch(() => state.name, (oldVal, newVal) => {
+      console.log(oldVal, newVal);
+    }, { deep: true, immediate: true })
+
+    //  watch(() => {
+    //   console.log(state.name + state.age);
+    // })
+
+    unwatch();
 
     setTimeout(() => {
-      state.anme = "888888"
-      al.value = "809087879"
-    }, 3000)
+      state.name = "888888"
+    }, 1000)
   </script>
 </body>
 

@@ -95,6 +95,10 @@ export class ReactiveEffect {
   }
 
   stop() {
+    if (this.active) {
+      preCleanEffect(this);
+      postCleanEffect(this);
+    }
     this.active = false;
   }
 }

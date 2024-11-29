@@ -13,8 +13,11 @@ export default function patchStyle(el, prevValue, nextValue) {
   if (prevValue) {
     for (let key in prevValue) {
       // 看以前的属性，如果没有就删除
-      if (nextValue[key] == null) {
-        style[key] = null;
+
+      if (nextValue) {
+        if (nextValue[key] == null) {
+          style[key] = null;
+        }
       }
     }
   }

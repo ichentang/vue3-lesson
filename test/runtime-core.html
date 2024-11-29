@@ -21,29 +21,17 @@
   <div id="app"></div>
 
   <script type="module">
-    import { h } from "/node_modules/@vue/runtime-dom/dist/runtime-dom.esm-browser.js";
+    // import { h } from "/node_modules/@vue/runtime-dom/dist/runtime-dom.esm-browser.js";
 
-    import { render } from "../packages/runtime-dom/dist/runtime-dom.js";
+    import { render, h } from "../packages/runtime-dom/dist/runtime-dom.js";
 
-    // console.log(createRenderer, render, h);
+    let ele1 = h(
+      "div",
+      { style: { color: 'red' } },
+      h('div', 'a'), h('div', 'bb'), h('div', 'ccc'));
 
-    // let ele = h(
-    //   "h1",
-    //   {
-    //     style: { color: 'red' },
-    //     class: 'ass',
-    //     onClick: () => alert(1),
-    //     a: 12
-    //   },
-    //   "runtime-dom"
-    // );
-
-    let ele = h(
-      "h1",
-      [h("p", "guang"), h('span', '20')]
-    );
-
-    render(ele, app)
+    render(ele1, app)
+    console.log(ele1);
   </script>
 </body>
 

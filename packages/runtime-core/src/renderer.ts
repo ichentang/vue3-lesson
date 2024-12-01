@@ -1,5 +1,5 @@
 import { ShapeFlags } from '@vue/shared';
-import { isSmaeVnode } from './createVnode';
+import { isSameVnode } from './createVnode';
 
 export function createRenderer(renderOptions) {
   // core中不关心如何渲染
@@ -23,10 +23,10 @@ export function createRenderer(renderOptions) {
     }
   };
 
-  const mountElement = (vnode, container) => {
+  const mountElement = (vnode, container, anchor) => {
+    // shapFlag是vnode的节点类型和 子节点类型 取异或的值
     const { type, children, props, shapeFlag } = vnode;
 
-    //
     let el = (vnode.el = hostCreateElement(type));
 
     if (props) {
@@ -35,14 +35,14 @@ export function createRenderer(renderOptions) {
       }
     }
 
-    // 位运算  & 或（组合）
+    // 位运算  & 或（组合）  9 & 8 > 0 说明儿子是文本元素
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
       hostSetElementText(el, children);
     } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       mountChildren(children, el);
     }
 
-    hostInsert(el, container);
+    hostInsert(el, container, anchor);
   };
 
   // 比较属性
@@ -66,6 +66,60 @@ export function createRenderer(renderOptions) {
       unmount(child);
     }
   };
+
+  // 比较两个儿子的差异更新
+  const patchKeyedChildren = (c1, c2, el) => {
+    let i = 0; //开始对比的索引
+    let e1 = c1.length - 1; //第一个数组的索引
+    let e2 = c2.length - 1; //第二个数组的索引
+
+    while (i <= e1 && i < e2) {
+      // 有任何一方循环结束 就要终止比较
+      const n1 = c1[i];
+      const n2 = c2[i];
+      if (isSameVnode(n1, n2)) {
+        // 更新当前节点的属性和儿子 （递归比较节点）
+        patch(n1, n2, el);
+      } else {
+        break;
+      }
+      i++;
+    }
+
+    while (i <= e1 && i <= e2) {
+      const n1 = c1[e1];
+      const n2 = c2[e2];
+
+      if (isSameVnode(n1, n2)) {
+        patch(n1, n2, el);
+      } else {
+        break;
+      }
+      e1--;
+      e2--;
+    }
+
+    if (i > e1) {
+      // 新的个数多
+      if (i <= e2) {
+        let nextPos = e2 + 1; //看一下当前下一个元素是否存在
+        let anchor = c2[nextPos]?.el;
+        while (i <= e2) {
+          patch(null, c2[i], el, anchor);
+          i++;
+        }
+      }
+    } else if (i > e2) {
+      // 旧的个数多
+      if (i <= e1) {
+        while (i <= e1) {
+          unmount(c1[i]);
+          i++;
+        }
+      }
+    }
+  };
+
   // 比较子节点
   const patchChildren = (n1, n2, el) => {
     // text array null
@@ -95,6 +149,7 @@ export function createRenderer(renderOptions) {
       if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
           //3 全量diff算法，比对两个数组
+          patchKeyedChildren(c1, c2, el);
         } else {
           // 4
           unmountChildren(c1);
@@ -130,31 +185,31 @@ export function createRenderer(renderOptions) {
     patchChildren(n1, n2, el);
   };
 
-  const processElement = (n1, n2, container) => {
+  const processElement = (n1, n2, container, anchor) => {
     if (n1 == null) {
       // 初始化操作
-      mountElement(n2, container);
+      mountElement(n2, container, anchor);
     } else {
       patchElment(n1, n2, container);
     }
   };
 
   // 渲染走这里
-  const patch = (n1, n2, container) => {
+  const patch = (n1, n2, container, anchor = null) => {
     // 两次渲染同一个元素直接跳过
     if (n1 == n2) {
       return;
     }
 
     // 直接移除老的dom元素，初始化新的dom元素
-    if (n1 && !isSmaeVnode(n1, n2)) {
+    if (n1 && !isSameVnode(n1, n2)) {
       unmount(n1);
       //执行n2的初始化
       n1 = null;
     }
 
     // 对元素处理
-    processElement(n1, n2, container);
+    processElement(n1, n2, container, anchor);
   };
 
   const unmount = (vnode) => hostRemove(vnode.el);

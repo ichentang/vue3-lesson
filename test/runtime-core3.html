@@ -29,12 +29,21 @@
       h('div', { key: 'a' }, 'aaa'),
       h('div', { key: 'b' }, 'bbb'),
       h('div', { key: 'c' }, 'ccc'),
+      h('div', { key: 'd' }, 'ddd'),
+      h('div', { key: 'e' }, 'eee'),
+      h('div', { key: 'f' }, 'fff'),
+      h('div', { key: 'g' }, 'ggg'),
     ]);
 
     let vnode2 = h("h1", [
       h('div', { key: 'a' }, 'aaa'),
-      // h('div', { key: 'b' }, 'bbb'),
-      // h('div', { key: 'c' }, 'ccc'),
+      h('div', { key: 'b' }, 'bbb'),
+      h('div', { key: 'e' }, 'eee'),
+      h('div', { key: 'c' }, 'ccc'),
+      h('div', { key: 'd' }, 'ddd'),
+      h('div', { key: 'h' }, 'hhh'),
+      h('div', { key: 'f' }, 'fff'),
+      h('div', { key: 'g' }, 'ggg'),
     ]);
 
     render(vnode1, app)

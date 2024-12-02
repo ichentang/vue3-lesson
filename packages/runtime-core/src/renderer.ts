@@ -73,13 +73,12 @@ export function createRenderer(renderOptions) {
     let e1 = c1.length - 1; //第一个数组的索引
     let e2 = c2.length - 1; //第二个数组的索引
 
-    while (i <= e1 && i < e2) {
+    while (i <= e1 && i <= e2) {
       // 有任何一方循环结束 就要终止比较
       const n1 = c1[i];
       const n2 = c2[i];
       if (isSameVnode(n1, n2)) {
-        // 更新当前节点的属性和儿子 （递归比较节点）
-        patch(n1, n2, el);
+        patch(n1, n2, el); // 更新当前节点的属性和儿子 （递归比较节点）
       } else {
         break;
       }
@@ -115,6 +114,47 @@ export function createRenderer(renderOptions) {
         while (i <= e1) {
           unmount(c1[i]);
           i++;
+        }
+      }
+    } else {
+      let s1 = i;
+      let s2 = i;
+
+      const keyToNewIndexMap = new Map(); //做一个映射表用于快速查找，看老的是否在新的里面还有，没有就删除，有的就更新
+
+      for (let i = s2; i < e2; i++) {
+        const vnode = c2[i];
+        keyToNewIndexMap.set(vnode.key, i);
+      }
+
+      for (let i = s1; i < e1; i++) {
+        const vnode = c1[i];
+
+        const newIndex = keyToNewIndexMap.get(vnode.key);
+
+        if (newIndex == undefined) {
+          //若干新的里面找不到，则说明老的有，要删除
+          unmount(vnode);
+        } else {
+          // 比较前后节点的差异，更行属性和儿子
+          patch(vnode, c2[newIndex], el);
+        }
+      }
+
+      // 调整顺序，可以按照新的队列，倒序插入insertBefore，通过参照物往前插入
+      // 插入的过程中，可能新的元素多，需要创建
+      let toBePatched = e2 - s2 + 1;
+
+      for (let i = toBePatched - 1; i >= 0; i--) {
+        let newIndex = s2 + i;
+        let acnhor = c2[newIndex + 1]?.el;
+        let vnode = c2[newIndex];
+
+        //新列表中插入的元素
+        if (!vnode.el) {
+          patch(null, vnode, el, acnhor); //创建h插入
+        } else {
+          hostInsert(vnode, el, acnhor);
         }
       }
     }

@@ -1,9 +1,8 @@
 import { ShapeFlags } from '@vue/shared';
 import { isSameVnode } from './createVnode';
+import getSequence from './seq';
 
 export function createRenderer(renderOptions) {
-  // core中不关心如何渲染
-
   const {
     insert: hostInsert,
     remove: hostRemove,
@@ -121,32 +120,36 @@ export function createRenderer(renderOptions) {
       let s2 = i;
 
       const keyToNewIndexMap = new Map(); //做一个映射表用于快速查找，看老的是否在新的里面还有，没有就删除，有的就更新
+      let toBePatched = e2 - s2 + 1; //倒序插入的个数
+      let newIndexToOldMapIndex = new Array(toBePatched).fill(0); // 节点在老数组中对应的下标 如果为0说明是新增节点
 
-      for (let i = s2; i < e2; i++) {
+      for (let i = s2; i <= e2; i++) {
         const vnode = c2[i];
         keyToNewIndexMap.set(vnode.key, i);
       }
 
-      for (let i = s1; i < e1; i++) {
+      for (let i = s1; i <= e1; i++) {
         const vnode = c1[i];
-
         const newIndex = keyToNewIndexMap.get(vnode.key);
-
         if (newIndex == undefined) {
           //若干新的里面找不到，则说明老的有，要删除
           unmount(vnode);
         } else {
-          // 比较前后节点的差异，更行属性和儿子
+          // 有可能i为0 为了保证0是没有比对过的元素 直接i+1
+          newIndexToOldMapIndex[newIndex - s2] = i + 1;
+          // 比较前后节点的差异，更新属性和儿子
           patch(vnode, c2[newIndex], el);
         }
       }
 
       // 调整顺序，可以按照新的队列，倒序插入insertBefore，通过参照物往前插入
       // 插入的过程中，可能新的元素多，需要创建
-      let toBePatched = e2 - s2 + 1;
+      let increaasingSeq = getSequence(newIndexToOldMapIndex);
+      let j = increaasingSeq.length - 1; //索引
 
+      // 调整顺序 可以按照新的队列 倒序插入
       for (let i = toBePatched - 1; i >= 0; i--) {
-        let newIndex = s2 + i;
+        let newIndex = s2 + i; // 要插入的节点 在 新数组中 对应的索引，找他下个元素作为参照物进行插入
         let acnhor = c2[newIndex + 1]?.el;
         let vnode = c2[newIndex];
 
@@ -154,7 +157,11 @@ export function createRenderer(renderOptions) {
         if (!vnode.el) {
           patch(null, vnode, el, acnhor); //创建h插入
         } else {
-          hostInsert(vnode, el, acnhor);
+          if (i === increaasingSeq[j]) {
+            j--;
+          } else {
+            hostInsert(vnode.el, el, acnhor); //倒序插入
+          }
         }
       }
     }

@@ -1,5 +1,5 @@
 import { ShapeFlags } from '@vue/shared';
-import { isSameVnode } from './createVnode';
+import { isSameVnode, Text } from './createVnode';
 import getSequence from './seq';
 
 export function createRenderer(renderOptions) {
@@ -241,6 +241,19 @@ export function createRenderer(renderOptions) {
     }
   };
 
+  const processText = (n1, n2, container) => {
+    if (n1 === null) {
+      // 虚拟节点要关联真实节点
+      // 将节点插入道页面中
+      hostInsert((n2.el = hostCreateText(n2.children)), container);
+    } else {
+      const el = (n2.el = n1.el);
+      if (n1.children !== n2.children) {
+        hostSetElementText(el, n2.children);
+      }
+    }
+  };
+
   // 渲染走这里
   const patch = (n1, n2, container, anchor = null) => {
     // 两次渲染同一个元素直接跳过
@@ -255,8 +268,14 @@ export function createRenderer(renderOptions) {
       n1 = null;
     }
 
-    // 对元素处理
-    processElement(n1, n2, container, anchor);
+    const { type } = n2;
+    switch (type) {
+      case Text:
+        processText(n1, n2, container);
+        break;
+      default:
+        processElement(n1, n2, container, anchor); // 对元素处理
+    }
   };
 
   const unmount = (vnode) => hostRemove(vnode.el);
@@ -268,11 +287,11 @@ export function createRenderer(renderOptions) {
       if (container._vnode) {
         unmount(container._vnode);
       }
+    } else {
+      // 将虚拟节点变成真实节点渲染
+      patch(container._vnode || null, vnode, container);
+      container._vnode = vnode;
     }
-
-    // 将虚拟节点变成真实节点渲染
-    patch(container._vnode || null, vnode, container);
-    container._vnode = vnode;
   };
 
   return {

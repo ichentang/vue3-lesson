@@ -1,12 +1,14 @@
 import { isString, ShapeFlags } from '@vue/shared';
 
+export const Text = Symbol('text');
+
 /**
  * isVnode
  * @param value
  * @returns
  */
 export function isVnode(value) {
-  return value?.__v_isVnode;
+  return !!(value && value.__v_isVnode);
 }
 
 export function isSameVnode(n1, n2) {

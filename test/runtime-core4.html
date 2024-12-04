@@ -23,13 +23,22 @@
   <script type="module">
     // import { h } from "/node_modules/@vue/runtime-dom/dist/runtime-dom.esm-browser.js";
 
-    import { render, h, Text } from "../packages/runtime-dom/dist/runtime-dom.js";
+    import { render, h, Text, Fragment } from "../packages/runtime-dom/dist/runtime-dom.js";
+
+    // TODO: text
+    // render(h(Text, "chen"), app)
+
+    // setTimeout(() => {
+    //   render(h(Text, "chen guang"), app)
+    // }, 2000)
 
 
-    render(h(Text, "chen"), app)
+    // TODO:Fragment
+    render(h(Fragment, [h('div', 'hello'), h('a', 'world')]), app)
 
     setTimeout(() => {
-      render(h(Text, "chen guang"), app)
+      // render(h(Fragment, [h('div', 'hello'), h('a', '23623523')]), app)
+      render(null, app)
     }, 2000)
 
   </script>

@@ -3,6 +3,7 @@ import { Fragment, isSameVnode, Text } from './createVnode';
 import getSequence from './seq';
 import { reactive, ReactiveEffect } from '@vue/reactivity';
 import { queueJob } from './scheduler';
+import { createComponentInstance, setupComponent } from './component';
 
 export function createRenderer(renderOptions) {
   const {
@@ -17,6 +18,7 @@ export function createRenderer(renderOptions) {
     patchProp: hostPatchProp,
   } = renderOptions;
 
+  // 批量挂载
   const mountChildren = (children, container) => {
     for (let i = 0; i < children.length; i++) {
       // children[i] 可能是纯文本元素
@@ -24,8 +26,9 @@ export function createRenderer(renderOptions) {
     }
   };
 
+  // 挂载
   const mountElement = (vnode, container, anchor) => {
-    // shapFlag是vnode的节点类型和 子节点类型 取异或的值
+    // shapeFlag是vnode的节点类型和 子节点类型 取异或的值
     const { type, children, props, shapeFlag } = vnode;
 
     let el = (vnode.el = hostCreateElement(type));
@@ -46,6 +49,23 @@ export function createRenderer(renderOptions) {
     hostInsert(el, container, anchor);
   };
 
+  // 批量卸载
+  const unmountChildren = (children) => {
+    for (let i = 0; i < children.length; i++) {
+      let child = children[i];
+      unmount(child);
+    }
+  };
+
+  // 卸载
+  const unmount = (vnode) => {
+    if (vnode.type === Fragment) {
+      unmountChildren(vnode.children);
+    } else {
+      hostRemove(vnode.el);
+    }
+  };
+
   // 比较属性
   const patchProps = (oldProps, newProps, el) => {
     // 新的全生效
@@ -58,13 +78,6 @@ export function createRenderer(renderOptions) {
         // 以前多的现在没有了，需要删除掉
         hostPatchProp(el, key, oldProps[key], null);
       }
-    }
-  };
-
-  const unmountChildren = (children) => {
-    for (let i = 0; i < children.length; i++) {
-      let child = children[i];
-      unmount(child);
     }
   };
 
@@ -146,23 +159,23 @@ export function createRenderer(renderOptions) {
 
       // 调整顺序，可以按照新的队列，倒序插入insertBefore，通过参照物往前插入
       // 插入的过程中，可能新的元素多，需要创建
-      let increaasingSeq = getSequence(newIndexToOldMapIndex);
-      let j = increaasingSeq.length - 1; //索引
+      let increasingSeq = getSequence(newIndexToOldMapIndex);
+      let j = increasingSeq.length - 1; //索引
 
       // 调整顺序 可以按照新的队列 倒序插入
       for (let i = toBePatched - 1; i >= 0; i--) {
         let newIndex = s2 + i; // 要插入的节点 在 新数组中 对应的索引，找他下个元素作为参照物进行插入
-        let acnhor = c2[newIndex + 1]?.el;
+        let anchor = c2[newIndex + 1]?.el;
         let vnode = c2[newIndex];
 
         //新列表中插入的元素
         if (!vnode.el) {
-          patch(null, vnode, el, acnhor); //创建h插入
+          patch(null, vnode, el, anchor); //创建h插入
         } else {
-          if (i === increaasingSeq[j]) {
+          if (i === increasingSeq[j]) {
             j--;
           } else {
-            hostInsert(vnode.el, el, acnhor); //倒序插入
+            hostInsert(vnode.el, el, anchor); //倒序插入
           }
         }
       }
@@ -217,7 +230,7 @@ export function createRenderer(renderOptions) {
   };
 
   // 比较元素
-  const patchElment = (n1, n2, container) => {
+  const patchElement = (n1, n2, container) => {
     // 1.比较元素的差异，肯定需要复用的dom元素
     // 2.比较属性和元素的子节点
 
@@ -239,7 +252,7 @@ export function createRenderer(renderOptions) {
       // 初始化操作
       mountElement(n2, container, anchor);
     } else {
-      patchElment(n1, n2, container);
+      patchElement(n1, n2, container);
     }
   };
 
@@ -264,84 +277,8 @@ export function createRenderer(renderOptions) {
     }
   };
 
-  // 初始化属性
-  const initProps = (instance, rawProps) => {
-    const props = {};
-    const attrs = {};
-
-    const propsOptions = instance.propsOptions || {}; //组件中定义的
-
-    if (rawProps) {
-      for (let key in rawProps) {
-        const value = rawProps[key];
-
-        if (key in propsOptions) {
-          props[key] = value;
-        } else {
-          attrs[key] = value;
-        }
-      }
-    }
-    instance.attrs = attrs;
-    instance.props = reactive(props); //
-  };
-
-  const mountComponent = (vnode, container, anchor) => {
-    // 组件基于自己的状态重新执行
-    const { data = () => {}, render, props: propsOptions = {} } = vnode.type;
-
-    const state = reactive(data()); //组件的状态
-
-    const instance = {
-      state,
-      vnode: vnode,
-      subTree: null,
-      isMounted: false,
-      update: null,
-      attrs: {},
-      props: {},
-      propsOptions,
-      component: null,
-      proxy: null, //代理props，attrs，data
-    };
-
-    // 根据propsOptions 来区分props，attrs
-    vnode.component = instance;
-    // 初始化props
-    initProps(instance, vnode.props);
-
-    const publicProperty = {
-      $attrs: (instance) => instance.attrs,
-    };
-
-    instance.proxy = new Proxy(instance, {
-      get(target, key) {
-        const { props, state } = target;
-
-        if (state && hasOwn(state, key)) {
-          return state[key];
-        } else if (props && hasOwn(props, key)) {
-          return props[key];
-        }
-
-        // 对于无法修改的属性 $slots ...
-        const getter = publicProperty[key];
-        if (getter) {
-          return getter(target);
-        }
-      },
-      set(target, key, value) {
-        const { props, state } = target;
-        if (state && hasOwn(state, key)) {
-          state[key] = value;
-        } else if (props && hasOwn(props, key)) {
-          // props[key] = value;
-          console.warn('props are readOnly');
-          return false;
-        }
-        return true;
-      },
-    });
+  const setupRenderEffect = (instance, container, anchor) => {
+    const { render } = instance;
 
     // props，attrs，data
     const componentUpdateFn = () => {
@@ -359,10 +296,21 @@ export function createRenderer(renderOptions) {
       }
     };
 
+    // 3.创建一个effect
     const effect = new ReactiveEffect(componentUpdateFn, () => queueJob(update));
-
     const update = (instance.update = () => effect.run());
     update();
+  };
+
+  const mountComponent = (vnode, container, anchor) => {
+    // 1.先创建组件实例 并且把这个实例放到虚拟节点上
+    const instance = (vnode.comment = createComponentInstance(vnode));
+
+    // 2.给实例的属性赋值
+    setupComponent(instance);
+
+    // 3.创建一个effect 组件可以基于自己的状态重新渲染 其实每个组件相当于一个effect
+    setupRenderEffect(instance, container, anchor);
   };
 
   const processComponent = (n1, n2, container, anchor) => {
@@ -405,15 +353,6 @@ export function createRenderer(renderOptions) {
     }
   };
 
-  // 卸载
-  const unmount = (vnode) => {
-    if (vnode.type === Fragment) {
-      unmountChildren(vnode.children);
-    } else {
-      hostRemove(vnode.el);
-    }
-  };
-
   // 多次调用虚拟节点 回进行虚拟节点的比较，在进行更新
   const render = (vnode, container) => {
     if (vnode === null) {
@@ -428,7 +367,5 @@ export function createRenderer(renderOptions) {
     }
   };
 
-  return {
-    render,
-  };
+  return { render };
 }

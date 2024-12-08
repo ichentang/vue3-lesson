@@ -1,4 +1,4 @@
-import { ShapeFlags } from '@vue/shared';
+import { hasOwn, ShapeFlags } from '@vue/shared';
 import { Fragment, isSameVnode, Text } from './createVnode';
 import getSequence from './seq';
 import { reactive, ReactiveEffect } from '@vue/reactivity';
@@ -264,30 +264,96 @@ export function createRenderer(renderOptions) {
     }
   };
 
-  const mountComponent = (n2, container, anchor) => {
+  // 初始化属性
+  const initProps = (instance, rawProps) => {
+    const props = {};
+    const attrs = {};
+
+    const propsOptions = instance.propsOptions || {}; //组件中定义的
+
+    if (rawProps) {
+      for (let key in rawProps) {
+        const value = rawProps[key];
+
+        if (key in propsOptions) {
+          props[key] = value;
+        } else {
+          attrs[key] = value;
+        }
+      }
+    }
+    instance.attrs = attrs;
+    instance.props = reactive(props); //
+  };
+
+  const mountComponent = (vnode, container, anchor) => {
     // 组件基于自己的状态重新执行
-    const { data = () => {}, render } = n2.type;
+    const { data = () => {}, render, props: propsOptions = {} } = vnode.type;
 
     const state = reactive(data()); //组件的状态
 
     const instance = {
       state,
-      vnode: n2,
+      vnode: vnode,
       subTree: null,
       isMounted: false,
       update: null,
+      attrs: {},
+      props: {},
+      propsOptions,
+      component: null,
+      proxy: null, //代理props，attrs，data
     };
 
+    // 根据propsOptions 来区分props，attrs
+    vnode.component = instance;
+    // 初始化props
+    initProps(instance, vnode.props);
+
+    const publicProperty = {
+      $attrs: (instance) => instance.attrs,
+    };
+
+    instance.proxy = new Proxy(instance, {
+      get(target, key) {
+        const { props, state } = target;
+
+        if (state && hasOwn(state, key)) {
+          return state[key];
+        } else if (props && hasOwn(props, key)) {
+          return props[key];
+        }
+
+        // 对于无法修改的属性 $slots ...
+        const getter = publicProperty[key];
+        if (getter) {
+          return getter(target);
+        }
+      },
+      set(target, key, value) {
+        const { props, state } = target;
+        if (state && hasOwn(state, key)) {
+          state[key] = value;
+        } else if (props && hasOwn(props, key)) {
+          // props[key] = value;
+          console.warn('props are readOnly');
+          return false;
+        }
+        return true;
+      },
+    });
+
+    // props，attrs，data
     const componentUpdateFn = () => {
       if (!instance.isMounted) {
-        const subTree = render.call(state, state);
+        const subTree = render.call(instance.proxy, instance.proxy);
         patch(null, subTree, container, anchor);
 
         instance.subTree = subTree;
         instance.isMounted = true;
       } else {
         // 基于状态的组件更新
-        const subTree = render.call(state, state);
+        const subTree = render.call(instance.proxy, instance.proxy);
         patch(instance.subTree, subTree, container, anchor);
         instance.subTree = subTree;
       }

@@ -1,6 +1,6 @@
 // 打包packages下的模块
 
-// node devv.js （要打包的名字 -f 打包的格式） === argv.slcie(2)
+// node dev.js （要打包的名字 -f 打包的格式） === argv.slice(2)
 //eg: node scripts/dev.js reactivity -f esm
 
 import minimist from "minimist";

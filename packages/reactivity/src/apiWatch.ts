@@ -4,7 +4,7 @@ import { isReactive } from './reactive';
 import { isRef } from './ref';
 
 export function watch(source, cb, options = {} as any) {
-  // watchEffect 也是基于doWactch实现
+  // watchEffect 也是基于doWatch实现
   return doWatch(source, cb, options);
 }
 

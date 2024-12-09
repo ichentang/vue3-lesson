@@ -313,12 +313,52 @@ export function createRenderer(renderOptions) {
     setupRenderEffect(instance, container, anchor);
   };
 
+  const hasPropsChange = (prevProps, nextProps) => {
+    let nKeys = Object.keys(nextProps);
+
+    if (nKeys.length !== Object.keys(prevProps).length) {
+      return true
+    }
+
+    for (let i = 0; i < nKeys.length; i++) {
+      const key = nKeys[i];
+      if (nextProps[key] !== prevProps[key]) {
+        return true;
+      }
+    }
+  }
+
+  const updateProps = (instance, prevProps, nextProps) => {
+
+    if (hasPropsChange(prevProps, nextProps)) {
+      for (let key in nextProps) {
+        instance.props[key] = nextProps[key]
+      }
+
+      for (let key in instance.props) {
+        if (!(key in nextProps)) {
+          delete instance.props[key]
+        }
+      }
+    }
+  }
+
+  const updateComponent = (n1, n2) => {
+    const instance = (n2.component = n1.component); // 复用组件的实例
+
+    const { props: prevProps } = n1;
+    const { props: nextProps } = n2;
+
+    updateProps(instance, prevProps, nextProps);
+  }
+
   const processComponent = (n1, n2, container, anchor) => {
     if (n1 === null) {
       // 初始渲染
       mountComponent(n2, container, anchor);
     } else {
       // 组件更新
+      updateComponent(n1, n2);
     }
   };
 

@@ -1,7 +1,7 @@
 import { proxyRefs, reactive } from '@vue/reactivity';
 import { hasOwn, isFunction, ShapeFlags } from '@vue/shared';
 
-export function createComponentInstance(vnode, parentComponent) {
+export function createComponentInstance(vnode, parent) {
   const instance = {
     data: null,
     vnode: vnode,
@@ -15,9 +15,9 @@ export function createComponentInstance(vnode, parentComponent) {
     component: null,
     proxy: null, //代理props，attrs，data
     setupState: {},
-    exposed: null,
-    parent: parentComponent,
-    provides: parentComponent ? parentComponent.provides : Object.create(null),
+    exposed: {},
+    parent: parent,
+    provides: parent ? parent.provides : Object.create(null),
   };
 
   return instance;
@@ -84,23 +84,10 @@ const handler = {
 };
 
 export function initSlots(instance, children) {
-  if (instance.vnode.ShapeFlags & ShapeFlags.SLOTS_CHILDREN) {
+  if (instance.vnode.shapeFlag & ShapeFlags.SLOTS_CHILDREN) {
     instance.slots = children;
   } else {
     instance.slots = {};
-    if (children) {
-      children.forEach((child) => {
-        if (child.shapeFlag & ShapeFlags.TEXT_CHILDREN) {
-          instance.slots.default = [child];
-        } else {
-          if (instance.slots[child.type]) {
-            instance.slots[child.type].push(child);
-          } else {
-            instance.slots[child.type] = [child];
-          }
-        }
-      });
-    }
   }
 }
 
@@ -122,7 +109,8 @@ export function setupComponent(instance) {
       expose: (value) => {
         instance.exposed = value;
       },
-      emit(event, ...payload) {
+      emit: (event, payload) => {
+        // myevent -> onMyEvent
         const eventName = `on${event[0].toUpperCase() + event.slice(1)}`;
         const handler = instance.vnode.props[eventName];
         handler && handler(payload);

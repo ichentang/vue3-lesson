@@ -1,7 +1,7 @@
 import { ShapeFlags } from '@vue/shared';
 import { createVnode, Fragment, isSameVnode, Text } from './createVnode';
 import getSequence from './seq';
-import { ReactiveEffect } from '@vue/reactivity';
+import { isRef, ReactiveEffect } from '@vue/reactivity';
 import { queueJob } from './scheduler';
 import { createComponentInstance, setupComponent } from './component';
 import { invokeArray } from './apiLifeCycle';
@@ -65,17 +65,15 @@ export function createRenderer(renderOptions) {
   // 批量卸载
   const unmountChildren = (children) => {
     for (let i = 0; i < children.length; i++) {
-      let child = children[i];
-      unmount(child);
+      unmount(children[i]);
     }
   };
 
   // 卸载
   const unmount = (vnode) => {
-    const { shapeFlag } = vnode;
     if (vnode.type === Fragment) {
       unmountChildren(vnode.children);
-    } else if (shapeFlag & ShapeFlags.COMPONENT) {
+    } else if (vnode.shapeFlag & ShapeFlags.COMPONENT) {
       unmount(vnode.component.subTree);
     } else {
       hostRemove(vnode.el);
@@ -311,8 +309,6 @@ export function createRenderer(renderOptions) {
   };
 
   const setupRenderEffect = (instance, container, anchor) => {
-    const { render } = instance;
-
     // props，attrs，data
     const componentUpdateFn = () => {
       const { bm, m } = instance;
@@ -343,6 +339,7 @@ export function createRenderer(renderOptions) {
           invokeArray(bu);
         }
 
+        // 基于状态的组件更新
         const subTree = renderComponent(instance);
         patch(instance.subTree, subTree, container, anchor, instance);
         instance.subTree = subTree;
@@ -361,7 +358,7 @@ export function createRenderer(renderOptions) {
 
   const mountComponent = (vnode, container, anchor, parentComponent) => {
     // 1.先创建组件实例 并且把这个实例放到虚拟节点上
-    const instance = (vnode.comment = createComponentInstance(vnode, parentComponent));
+    const instance = (vnode.component = createComponentInstance(vnode, parentComponent));
 
     // 2.给实例的属性赋值
     setupComponent(instance);
@@ -383,6 +380,7 @@ export function createRenderer(renderOptions) {
         return true;
       }
     }
+    return false;
   };
 
   const updateProps = (instance, prevProps, nextProps) => {
@@ -432,9 +430,7 @@ export function createRenderer(renderOptions) {
   // 渲染走这里
   const patch = (n1, n2, container, anchor = null, parentComponent = null) => {
     // 两次渲染同一个元素直接跳过
-    if (n1 == n2) {
-      return;
-    }
+    if (n1 == n2) return;
 
     // 直接移除老的dom元素，初始化新的dom元素
     if (n1 && !isSameVnode(n1, n2)) {
@@ -443,7 +439,8 @@ export function createRenderer(renderOptions) {
       n1 = null;
     }
 
-    const { type, shapeFlag } = n2;
+    // 两个节点是相同的虚拟节点 比较差异
+    const { type, shapeFlag, ref } = n2;
     switch (type) {
       case Text:
         processText(n1, n2, container);
@@ -458,7 +455,18 @@ export function createRenderer(renderOptions) {
           processComponent(n1, n2, container, anchor, parentComponent);
         }
     }
+
+    if (ref !== null) {
+      setRef(ref, n2);
+    }
   };
+
+  function setRef(rawRef, vnode) {
+    let value = vnode.ShapeFlags & ShapeFlags.STATEFUL_COMPONENT ? vnode.exposed || vnode.component.proxy : vnode.el;
+    if (isRef(rawRef)) {
+      rawRef.value = value;
+    }
+  }
 
   // 多次调用虚拟节点 回进行虚拟节点的比较，在进行更新
   const render = (vnode, container) => {

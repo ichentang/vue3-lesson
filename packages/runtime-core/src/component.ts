@@ -1,5 +1,5 @@
 import { proxyRefs, reactive } from '@vue/reactivity';
-import { hasOwn, isFunction } from '@vue/shared';
+import { hasOwn, isFunction, ShapeFlags } from '@vue/shared';
 
 export function createComponentInstance(vnode) {
   const instance = {
@@ -10,10 +10,12 @@ export function createComponentInstance(vnode) {
     update: null,
     attrs: {},
     props: {},
+    slots: {},
     propsOptions: vnode.type.props, //用户生命的那些属性是组件的属性
     component: null,
     proxy: null, //代理props，attrs，data
-    setupState: {}
+    setupState: {},
+    exposed: null,
   };
 
   return instance;
@@ -43,6 +45,7 @@ const initProps = (instance, rawProps) => {
 
 const publicProperty = {
   $attrs: (instance) => instance.attrs,
+  $slots: (instance) => instance.slots,
 };
 
 // 代理对象
@@ -55,7 +58,7 @@ const handler = {
     } else if (props && hasOwn(props, key)) {
       return props[key];
     } else if (setupState && hasOwn(setupState, key)) {
-      return setupState[key]
+      return setupState[key];
     }
 
     // 对于无法修改的属性 $slots ...
@@ -72,30 +75,63 @@ const handler = {
       console.warn('props are readOnly');
       return false;
     } else if (setupState && hasOwn(setupState, key)) {
-      return setupState[key] = value
+      return (setupState[key] = value);
     }
     return true;
   },
 };
 
+export function initSlots(instance, children) {
+  if (instance.vnode.ShapeFlags & ShapeFlags.SLOTS_CHILDREN) {
+    instance.slots = children;
+  } else {
+    instance.slots = {};
+    if (children) {
+      children.forEach((child) => {
+        if (child.shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+          instance.slots.default = [child];
+        } else {
+          if (instance.slots[child.type]) {
+            instance.slots[child.type].push(child);
+          } else {
+            instance.slots[child.type] = [child];
+          }
+        }
+      });
+    }
+  }
+}
 export function setupComponent(instance) {
   // 根据propsOptions 来区分出props,attrs
   const { vnode } = instance;
   // 赋值属性
   initProps(instance, vnode.props);
+  initSlots(instance, vnode.children);
   // 赋值代理对象
   instance.proxy = new Proxy(instance, handler);
 
-  const { data = () => { }, render, setup } = vnode.type;
+  const { data = () => {}, render, setup } = vnode.type;
 
   if (setup) {
-    const setupContext = {}
-    const setupResult = setup(instance.props, setupContext)
+    const setupContext = {
+      slots: instance.slots,
+      attrs: instance.attrs,
+      expose: (value) => {
+        instance.exposed = value;
+      },
+      emit(event, ...payload) {
+        const eventName = `on${event[0].toUpperCase() + event.slice(1)}`;
+        const handler = instance.vnode.props[eventName];
+        handler && handler(payload);
+      },
+    };
+
+    const setupResult = setup(instance.props, setupContext);
 
     if (isFunction(setupResult)) {
-      instance.render = setupResult
+      instance.render = setupResult;
     } else {
-      instance.setupState = proxyRefs(setupResult)
+      instance.setupState = proxyRefs(setupResult);
     }
   }
 

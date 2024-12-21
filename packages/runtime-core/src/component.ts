@@ -101,6 +101,7 @@ export function initSlots(instance, children) {
     }
   }
 }
+
 export function setupComponent(instance) {
   // 根据propsOptions 来区分出props,attrs
   const { vnode } = instance;
@@ -126,7 +127,11 @@ export function setupComponent(instance) {
       },
     };
 
+    setCurrentInstance(instance);
+
     const setupResult = setup(instance.props, setupContext);
+
+    unSetCurrentInstance();
 
     if (isFunction(setupResult)) {
       instance.render = setupResult;
@@ -146,3 +151,17 @@ export function setupComponent(instance) {
     instance.render = render;
   }
 }
+
+export let currentInstance = null;
+
+export const getCurrentInstance = () => {
+  return currentInstance;
+};
+
+export const setCurrentInstance = (instance) => {
+  currentInstance = instance;
+};
+
+export const unSetCurrentInstance = () => {
+  currentInstance = null;
+};

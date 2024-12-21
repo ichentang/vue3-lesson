@@ -1,9 +1,10 @@
-import { hasOwn, ShapeFlags } from '@vue/shared';
+import { ShapeFlags } from '@vue/shared';
 import { Fragment, isSameVnode, Text } from './createVnode';
 import getSequence from './seq';
-import { reactive, ReactiveEffect } from '@vue/reactivity';
+import { ReactiveEffect } from '@vue/reactivity';
 import { queueJob } from './scheduler';
 import { createComponentInstance, setupComponent } from './component';
+import { invokeArray } from './apiLifeCycle';
 
 export function createRenderer(renderOptions) {
   const {
@@ -291,24 +292,41 @@ export function createRenderer(renderOptions) {
 
     // props，attrs，data
     const componentUpdateFn = () => {
+      const { bm, m } = instance;
       if (!instance.isMounted) {
+        if (bm) {
+          invokeArray(bm);
+        }
+
         const subTree = render.call(instance.proxy, instance.proxy);
         patch(null, subTree, container, anchor);
 
         instance.subTree = subTree;
         instance.isMounted = true;
+
+        if (m) {
+          invokeArray(m);
+        }
       } else {
         // 基于状态的组件更新
-        const { next } = instance;
+        const { next, bu, u } = instance;
 
         if (next) {
           // 更新属性和插槽
           updateComponentPreRender(instance, next);
         }
 
+        if (bu) {
+          invokeArray(bu);
+        }
+
         const subTree = render.call(instance.proxy, instance.proxy);
         patch(instance.subTree, subTree, container, anchor);
         instance.subTree = subTree;
+
+        if (u) {
+          invokeArray(u);
+        }
       }
     };
 

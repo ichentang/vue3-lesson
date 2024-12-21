@@ -75,6 +75,8 @@ export function createRenderer(renderOptions) {
       unmountChildren(vnode.children);
     } else if (vnode.shapeFlag & ShapeFlags.COMPONENT) {
       unmount(vnode.component.subTree);
+    } else if (vnode.shapeFlag & ShapeFlags.TELEPORT) {
+      vnode.type.remove(vnode, unmountChildren);
     } else {
       hostRemove(vnode.el);
     }
@@ -451,6 +453,15 @@ export function createRenderer(renderOptions) {
       default:
         if (shapeFlag & ShapeFlags.ELEMENT) {
           processElement(n1, n2, container, anchor, parentComponent); // 对元素处理
+        } else if (shapeFlag & ShapeFlags.TELEPORT) {
+          type.process(n1, n2, container, anchor, parentComponent, {
+            mountChildren,
+            patchChildren,
+            move(vnode, container, anchor) {
+              // 移动节点
+              hostInsert(vnode.component ? vnode.component.subTree.el : vnode.el, container, anchor);
+            },
+          });
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
           processComponent(n1, n2, container, anchor, parentComponent);
         }
